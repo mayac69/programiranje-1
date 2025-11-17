@@ -202,7 +202,18 @@ let () = enke_deljive_s_3 |> dot_of_dfa |> print_endline
  avtomat sprejme podani niz.
 [*----------------------------------------------------------------------------*)
 
-let dfa_sprejema _ _ = false
+let dfa_sprejema (avtomat : DFA.t) (preverjan_niz : string) = 
+  let open DFA in
+  let rec dfa_sprejemna_aux trenutno_stanje indeks_trenutnega_stanja =
+    if indeks_trenutnega_stanja = String.length preverjan_niz then 
+      je_sprejemno_stanje avtomat trenutno_stanje
+    else 
+      match prehodna_funkcija avtomat trenutno_stanje preverjan_niz.[indeks_trenutnega_stanja] with
+      | None -> false
+      | Some naslednje_stanje -> dfa_sprejemna_aux naslednje_stanje (indeks_trenutnega_stanja + 1)
+    
+  in
+  dfa_sprejemna_aux (zacetno_stanje avtomat) 0
 
 let nizi =
   let razsiri nizi = List.map ((^) "0") nizi @ List.map ((^) "1") nizi in
@@ -331,17 +342,63 @@ end
 
 module NFA : NFA_SIG = struct
   type stanje = string
-  type t = unit
+  type t = {
+    stanja : stanje list;
+    zacetno_stanje : stanje;
+    sprejemna_stanja : stanje list;
+    prehodi_med_stanji : (stanje * char option * stanje) list
+  }
 
-  let ustvari _ _ = ()
-  let dodaj_stanje _ _ _ = ()
-  let dodaj_prehod _ _ _ _ = ()
-  let dodaj_prazen_prehod _ _ _ = ()
+  let ustvari podano_zacetno_stanje je_sprejemno_stanje = {
+    stanja = [podano_zacetno_stanje];
+    zacetno_stanje = podano_zacetno_stanje;
+    sprejemna_stanja = if je_sprejemno_stanje then [podano_zacetno_stanje] else [];
+    prehodi_med_stanji = [];
+  }
+  let dodaj_stanje naslednje_stanje je_sprejemno_stanje ze_obstojeci_avtomat = {
+    stanja = naslednje_stanje :: ze_obstojeci_avtomat.stanja;
+    zacetno_stanje = ze_obstojeci_avtomat.zacetno_stanje;
+    sprejemna_stanja = 
+      if je_sprejemno_stanje then naslednje_stanje :: ze_obstojeci_avtomat.sprejemna_stanja
+      else ze_obstojeci_avtomat.sprejemna_stanja;
+    prehodi_med_stanji = ze_obstojeci_avtomat.prehodi_med_stanji;
+  }
+  let dodaj_prehod zacetno_stanje znak_abecede koncno_stanje ze_obstojeci_avtomat = {
+    stanja = ze_obstojeci_avtomat.stanja;
+    zacetno_stanje = ze_obstojeci_avtomat.zacetno_stanje;
+    sprejemna_stanja = ze_obstojeci_avtomat.sprejemna_stanja;
+    prehodi_med_stanji = (zacetno_stanje, Some znak_abecede, koncno_stanje) :: ze_obstojeci_avtomat.prehodi_med_stanji;
+  }
+  let dodaj_prazen_prehod zacetno_stanje koncno_stanje ze_obstojeci_avtomat = {
+    stanja = ze_obstojeci_avtomat.stanja;
+    zacetno_stanje = ze_obstojeci_avtomat.zacetno_stanje;
+    sprejemna_stanja = ze_obstojeci_avtomat.sprejemna_stanja;
+    prehodi_med_stanji = (zacetno_stanje, None, koncno_stanje) :: ze_obstojeci_avtomat.prehodi_med_stanji;
+  }
 
-  let seznam_stanj _ = []
-  let zacetno_stanje _ = ""
-  let je_sprejemno_stanje _ _ = false
-  let prehodna_funkcija _ _ _ = []
+  let seznam_stanj avtomat = avtomat.stanja
+  let zacetno_stanje avtomat = avtomat.zacetno_stanje
+  let je_sprejemno_stanje avtomat stanje = 
+    let rec preverba_po_seznamu seznam =
+      match seznam with
+      | [] -> false
+      | x :: xs ->
+        if x = stanje then true
+        else preverba_po_seznamu xs 
+    in
+    preverba_po_seznamu avtomat.sprejemna_stanja
+  let prehodna_funkcija avtomat stanje_v_katerem_je_element element = 
+    let rec kje_se_stanje_pred_in_simbol_ujemata prehodi_stanj =
+      match prehodi_stanj with
+      | [] -> None
+      | (stanje_pred, simbol, stanje_po) :: preostali_seznam_prehodov -> 
+        if stanje_pred = stanje_v_katerem_je_element && simbol = element then Some stanje_po
+        else kje_se_stanje_pred_in_simbol_ujemata preostali_seznam_prehodov
+    in
+    kje_se_stanje_pred_in_simbol_ujemata avtomat.prehodi_med_stanji
+
+
+
   let seznam_prehodov _  = []
 end
 
